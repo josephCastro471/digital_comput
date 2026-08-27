@@ -75,13 +75,21 @@ No hay seed de servicios — regla dura: el catálogo lo carga Joseph directo en
 - `POST /api/conteo-monedas` — calculadora de apoyo para conteo de monedas de terceros (`denominaciones: {"0.05": 50, ...}`, calcula `total`). **Nunca** crea `movimiento_cuenta` — no afecta saldos.
 - `GET /api/conteo-monedas?fecha=`.
 
+## Ventas (Fase 4)
+
+`POST /api/ventas` conecta el catálogo de servicios con el núcleo de cuentas:
+
+- `items: [{servicio_id, cantidad, precio_unitario?}]` — `precio_unitario` es obligatorio solo para servicios `variable`; para `fijo` se toma `precio_base` y para `escalonado` se busca el tramo cuyo rango contiene la `cantidad`.
+- `cuenta_id` opcional — si se envía, la venta genera automáticamente un `movimiento_cuenta` tipo `deposito` por el `total` (con `referencia_tipo="venta"`), reutilizando la misma lógica de aplicación de saldo que `POST /api/cuentas/{id}/movimientos` (función `aplicar_movimiento` compartida entre ambos routers). Sin `cuenta_id`, la venta no toca ningún saldo.
+- `GET /api/ventas?fecha=`, `GET /api/ventas/{id}`.
+
 ## Tests
 
 ```bash
 pytest
 ```
 
-Los tests de `cuentas`, `servicios`, `arqueo`, `conteo-monedas` y `seed` corren contra SQLite en memoria (no requieren Postgres). Los de `auth` tampoco tocan la base.
+Los tests de `cuentas`, `servicios`, `arqueo`, `conteo-monedas`, `ventas` y `seed` corren contra SQLite en memoria (no requieren Postgres). Los de `auth` tampoco tocan la base.
 
 ## Estado
 
@@ -89,3 +97,4 @@ Los tests de `cuentas`, `servicios`, `arqueo`, `conteo-monedas` y `seed` corren 
 - **Fase 1** — completa y migrada: modelos `Cuenta`/`MovimientoCuenta`, endpoints, seed de las 6 cuentas reales.
 - **Fase 2** — completa y migrada: catálogo de servicios (`Servicio`/`EscalonPrecio`), endpoints. La UI de alta rápida queda pendiente para cuando arranque `computdigital-frontend/`.
 - **Fase 3** — completa y migrada: `ArqueoCaja`/`ArqueoDetalle` (por turno, un abierto a la vez) y `ConteoMonedas` (independiente, no toca cuentas).
+- **Fase 4** — completa y migrada: `Venta`/`VentaItem`, precio automático según `tipo_precio`, depósito automático en cuenta cuando se especifica `cuenta_id`.

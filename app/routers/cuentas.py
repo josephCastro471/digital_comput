@@ -26,6 +26,22 @@ def _get_cuenta_or_404(db: Session, cuenta_id: int) -> Cuenta:
     return cuenta
 
 
+def aplicar_movimiento(cuenta: Cuenta, tipo: TipoMovimiento, monto) -> None:
+    """Aplica el efecto de un movimiento sobre saldo_actual/cupo_utilizado.
+
+    Compartido con el router de ventas para no duplicar esta logica al
+    generar el deposito automatico de una venta cobrada a una cuenta.
+    """
+    if tipo == TipoMovimiento.USO:
+        cuenta.cupo_utilizado += monto
+    elif tipo == TipoMovimiento.DEPOSITO:
+        cuenta.saldo_actual += monto
+    elif tipo == TipoMovimiento.RETIRO:
+        cuenta.saldo_actual -= monto
+    elif tipo == TipoMovimiento.AJUSTE:
+        cuenta.saldo_actual += monto
+
+
 @router.get("", response_model=list[CuentaOut])
 def listar_cuentas(db: Session = Depends(get_db)):
     return db.scalars(select(Cuenta).order_by(Cuenta.nombre)).all()
@@ -56,14 +72,7 @@ def crear_movimiento(cuenta_id: int, payload: MovimientoCuentaCreate, db: Sessio
             detail="El movimiento 'uso' solo aplica a cuentas de tipo cupo_revolvente",
         )
 
-    if payload.tipo == TipoMovimiento.USO:
-        cuenta.cupo_utilizado += payload.monto
-    elif payload.tipo == TipoMovimiento.DEPOSITO:
-        cuenta.saldo_actual += payload.monto
-    elif payload.tipo == TipoMovimiento.RETIRO:
-        cuenta.saldo_actual -= payload.monto
-    elif payload.tipo == TipoMovimiento.AJUSTE:
-        cuenta.saldo_actual += payload.monto
+    aplicar_movimiento(cuenta, payload.tipo, payload.monto)
 
     movimiento = MovimientoCuenta(
         cuenta_id=cuenta.id,
