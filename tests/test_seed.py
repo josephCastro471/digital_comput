@@ -47,8 +47,17 @@ def test_seed_crea_los_proveedores_de_comision(db_session, monkeypatch):
     proveedores = session.query(ProveedorComision).all()
     session.close()
 
-    assert {p.nombre for p in proveedores} == set(PROVEEDORES_COMISION_INICIALES)
-    assert all(p.comision_pct == 0 for p in proveedores)
+    assert {p.nombre for p in proveedores} == {d["nombre"] for d in PROVEEDORES_COMISION_INICIALES}
+
+    payphone = next(p for p in proveedores if p.nombre == "Payphone")
+    assert payphone.comision_pct == 5
+    assert payphone.aplica_iva is True
+    assert payphone.iva_pct == 15
+
+    deuna = next(p for p in proveedores if p.nombre == "Deuna")
+    assert deuna.comision_pct == 4
+    assert deuna.aplica_iva is True
+    assert deuna.iva_pct == 15
 
 
 def test_seed_proveedores_es_idempotente(db_session, monkeypatch):

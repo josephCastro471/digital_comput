@@ -28,9 +28,9 @@ def test_calcular_comision_con_iva(client, db_session, auth_headers):
     )
     assert response.status_code == 200
     body = response.json()
-    assert body["comision"] == "3.50"
-    assert body["iva_sobre_comision"] == "0.53"
-    assert body["valor_cobrado"] == "104.03"
+    assert body["comision"] == "3.65"
+    assert body["iva_sobre_comision"] == "0.55"
+    assert body["valor_cobrado"] == "104.20"
 
 
 def test_calcular_comision_sin_iva(client, db_session, auth_headers):
@@ -43,9 +43,39 @@ def test_calcular_comision_sin_iva(client, db_session, auth_headers):
     )
     assert response.status_code == 200
     body = response.json()
-    assert body["comision"] == "1.00"
+    assert body["comision"] == "1.02"
     assert body["iva_sobre_comision"] == "0.00"
-    assert body["valor_cobrado"] == "51.00"
+    assert body["valor_cobrado"] == "51.02"
+
+
+def test_calcular_payphone_caso_real(client, db_session, auth_headers):
+    proveedor_id = _crear_proveedor(db_session, nombre="Payphone", comision_pct="5.00", aplica_iva=True, iva_pct="15.00")
+
+    response = client.post(
+        "/api/comisiones/calcular",
+        json={"proveedor_id": proveedor_id, "valor_recibir": "50.00"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["comision"] == "2.65"
+    assert body["iva_sobre_comision"] == "0.40"
+    assert body["valor_cobrado"] == "53.05"
+
+
+def test_calcular_deuna_caso_real(client, db_session, auth_headers):
+    proveedor_id = _crear_proveedor(db_session, nombre="Deuna", comision_pct="4.00", aplica_iva=True, iva_pct="15.00")
+
+    response = client.post(
+        "/api/comisiones/calcular",
+        json={"proveedor_id": proveedor_id, "valor_recibir": "48.00"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["comision"] == "2.01"
+    assert body["iva_sobre_comision"] == "0.30"
+    assert body["valor_cobrado"] == "50.31"
 
 
 def test_calcular_no_persiste_transaccion(client, db_session, auth_headers):
@@ -71,7 +101,7 @@ def test_crear_transaccion_persiste(client, db_session, auth_headers):
     )
     assert response.status_code == 201
     body = response.json()
-    assert body["valor_cobrado"] == "104.03"
+    assert body["valor_cobrado"] == "104.20"
 
     listado = client.get("/api/comisiones/transacciones", headers=auth_headers).json()
     assert len(listado) == 1

@@ -79,8 +79,8 @@ def test_resumen_suma_ventas_y_comisiones_del_dia(client, db_session, auth_heade
     body = response.json()
     assert body["ventas"] == {"cantidad": 1, "total": "10.00"}
     assert body["comisiones"]["cantidad"] == 1
-    assert body["comisiones"]["total_comision"] == "3.50"
-    assert body["comisiones"]["total_valor_cobrado"] == "104.03"
+    assert body["comisiones"]["total_comision"] == "3.65"
+    assert body["comisiones"]["total_valor_cobrado"] == "104.20"
 
 
 def test_resumen_incluye_arqueo_del_dia(client, auth_headers):

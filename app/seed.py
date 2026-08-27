@@ -15,7 +15,10 @@ CUENTAS_INICIALES = [
     {"nombre": "Fullcarga", "tipo": TipoCuenta.FONDO_FIJO},
 ]
 
-PROVEEDORES_COMISION_INICIALES = ["Payphone", "Deuna"]
+PROVEEDORES_COMISION_INICIALES = [
+    {"nombre": "Payphone", "comision_pct": Decimal("5.00"), "aplica_iva": True, "iva_pct": Decimal("15.00")},
+    {"nombre": "Deuna", "comision_pct": Decimal("4.00"), "aplica_iva": True, "iva_pct": Decimal("15.00")},
+]
 
 
 def seed_cuentas() -> None:
@@ -44,31 +47,28 @@ def seed_cuentas() -> None:
 
 
 def seed_proveedores_comision() -> None:
-    """Crea Payphone y Deuna con comision_pct=0. No hay POST para proveedores en la
-    API (regla dura: la config va en tabla, no en codigo) - configura los % reales
-    despues via PATCH /api/comisiones/proveedores/{id}."""
+    """Crea Payphone y Deuna con sus % reales de comision/IVA. No hay POST para
+    proveedores en la API (regla dura: la config va en tabla, no en codigo) -
+    si las tarifas cambian, se ajustan despues via PATCH /api/comisiones/proveedores/{id}."""
     db = SessionLocal()
     try:
         existentes = {p.nombre for p in db.query(ProveedorComision).all()}
         creados = []
-        for nombre in PROVEEDORES_COMISION_INICIALES:
-            if nombre in existentes:
+        for datos in PROVEEDORES_COMISION_INICIALES:
+            if datos["nombre"] in existentes:
                 continue
             db.add(
                 ProveedorComision(
-                    nombre=nombre,
-                    comision_pct=Decimal("0.00"),
-                    aplica_iva=False,
-                    iva_pct=Decimal("0.00"),
+                    nombre=datos["nombre"],
+                    comision_pct=datos["comision_pct"],
+                    aplica_iva=datos["aplica_iva"],
+                    iva_pct=datos["iva_pct"],
                 )
             )
-            creados.append(nombre)
+            creados.append(datos["nombre"])
         db.commit()
         if creados:
-            print(
-                f"Proveedores de comision creados: {', '.join(creados)} "
-                "(configura sus % reales via PATCH /api/comisiones/proveedores/{id})"
-            )
+            print(f"Proveedores de comision creados: {', '.join(creados)}")
         else:
             print("Los proveedores de comision ya existian, no se creo nada.")
     finally:

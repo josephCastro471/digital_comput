@@ -30,14 +30,26 @@ def _get_proveedor_or_404(db: Session, proveedor_id: int) -> ProveedorComision:
 
 
 def _calcular(proveedor: ProveedorComision, valor_recibir: Decimal) -> dict:
-    comision = (valor_recibir * proveedor.comision_pct / Decimal("100")).quantize(
-        DOS_DECIMALES, rounding=ROUND_HALF_UP
-    )
+    """valor_recibir es el neto que el negocio debe quedarse; se calcula el
+    valor a cobrar al cliente de forma que, tras descontar la comision del
+    proveedor (y el IVA sobre esa comision), quede exactamente valor_recibir."""
+    comision_pct = proveedor.comision_pct / Decimal("100")
+    iva_pct = proveedor.iva_pct / Decimal("100") if proveedor.aplica_iva else Decimal("0")
+
+    denominador = Decimal("1") - comision_pct * (Decimal("1") + iva_pct)
+    if denominador <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Configuracion de proveedor invalida: la comision combinada con el IVA es igual o mayor al 100%",
+        )
+
+    valor_cobrado_bruto = valor_recibir / denominador
+    comision = (valor_cobrado_bruto * comision_pct).quantize(DOS_DECIMALES, rounding=ROUND_HALF_UP)
+
     iva_sobre_comision = Decimal("0.00")
     if proveedor.aplica_iva:
-        iva_sobre_comision = (comision * proveedor.iva_pct / Decimal("100")).quantize(
-            DOS_DECIMALES, rounding=ROUND_HALF_UP
-        )
+        iva_sobre_comision = (comision * iva_pct).quantize(DOS_DECIMALES, rounding=ROUND_HALF_UP)
+
     valor_cobrado = valor_recibir + comision + iva_sobre_comision
     return {
         "comision": comision,
