@@ -45,7 +45,7 @@ alembic upgrade head
 
 La URL de conexión se toma de `DATABASE_URL` en `.env` (no está hardcodeada en `alembic.ini`).
 
-Pendiente de generar contra una base real: la primera migración (tablas `cuenta` y `movimiento_cuenta`). Requiere una `DATABASE_URL` válida en `.env` — correr `alembic revision --autogenerate -m "cuenta y movimiento_cuenta"` y revisar el archivo generado antes de `alembic upgrade head`.
+Migraciones aplicadas hasta ahora: `cuenta`/`movimiento_cuenta` (Fase 1) y `servicio`/`escalon_precio` (Fase 2).
 
 ## Seed de las 6 cuentas reales
 
@@ -57,15 +57,26 @@ python -m app.seed
 
 Es idempotente — si ya existen no duplica. Crea: Caja (efectivo), Pichincha (cupo_revolvente), Guayaquil/Bolivariano/Pacífico/Fullcarga (fondo_fijo), todas con saldo en 0.00 — los saldos reales se cargan después vía `POST /api/cuentas/{id}/movimientos` o `PATCH /api/cuentas/{id}/cupo`.
 
+## Catálogo de servicios (Fase 2)
+
+`POST /api/servicios` acepta 3 tipos de precio vía `tipo_precio`:
+
+- `fijo` — requiere `precio_base` (> 0), sin escalones.
+- `variable` — sin `precio_base` ni escalones (el precio se define en cada venta, Fase 4).
+- `escalonado` — sin `precio_base`, requiere `escalones: [{cantidad_desde, cantidad_hasta, precio_unitario}]` ordenados sin solaparse; el último escalón puede dejar `cantidad_hasta: null` (abierto).
+
+No hay seed de servicios — regla dura: el catálogo lo carga Joseph directo en el sistema.
+
 ## Tests
 
 ```bash
 pytest
 ```
 
-Los tests de `cuentas` y `seed` corren contra SQLite en memoria (no requieren Postgres). Los de `auth` tampoco tocan la base.
+Los tests de `cuentas`, `servicios` y `seed` corren contra SQLite en memoria (no requieren Postgres). Los de `auth` tampoco tocan la base.
 
 ## Estado
 
-- **Fase 0** — completa: estructura de carpetas, FastAPI + SQLAlchemy 2.0 + Alembic apuntando a Postgres (Neon), auth JWT con un solo admin (sin tabla de usuarios; credenciales vía `.env`).
-- **Fase 1** — código completo (modelos `Cuenta`/`MovimientoCuenta`, endpoints, seed, tests). Falta generar y aplicar la migración de Alembic contra una base real (local o Neon) — ver sección de Migraciones arriba.
+- **Fase 0** — completa: estructura de carpetas, FastAPI + SQLAlchemy 2.0 + Alembic apuntando a Postgres, auth JWT con un solo admin (sin tabla de usuarios; credenciales vía `.env`).
+- **Fase 1** — completa y migrada: modelos `Cuenta`/`MovimientoCuenta`, endpoints, seed de las 6 cuentas reales.
+- **Fase 2** — completa y migrada: catálogo de servicios (`Servicio`/`EscalonPrecio`), endpoints. La UI de alta rápida queda pendiente para cuando arranque `computdigital-frontend/`.
