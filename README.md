@@ -105,13 +105,20 @@ CRUD simple (`Directorio`), tipo `empresa` o `cliente`, con campos opcionales `c
 - `PATCH /api/inventario/{id}` — solo `nombre`/`costo`/`precio_venta`. El stock **no** se edita por PATCH, solo vía movimientos (mismo principio que `saldo_actual` en cuentas).
 - `POST /api/inventario/{id}/movimiento` — `tipo` es `"entrada"` o `"salida"` (a diferencia de los demás módulos, el modelo lo define como `str` libre, no un enum — ver `computdigital-reglas.md`); `salida` rechaza con 400 si `cantidad` supera el `stock_actual`. Devuelve el movimiento creado (no el accesorio).
 
+## Dashboard / reportes (Fase 8)
+
+Sin tablas nuevas — agrega datos de los módulos existentes. Ambos endpoints devuelven `ventas` (cantidad/total), `comisiones` (cantidad/total_comision/total_iva_sobre_comision/total_valor_cobrado), `arqueos` (lista, filtrados por `fecha_apertura` en el rango) y `cuentas` (snapshot del saldo **actual**, no reconstruye saldo histórico por fecha).
+
+- `GET /api/dashboard/resumen?fecha=` — resumen de un día.
+- `GET /api/dashboard/rango?desde=&hasta=` — mismo resumen agregado sobre un rango; 400 si `hasta < desde`.
+
 ## Tests
 
 ```bash
 pytest
 ```
 
-Los tests de `cuentas`, `servicios`, `arqueo`, `conteo-monedas`, `ventas`, `comisiones`, `directorio`, `inventario` y `seed` corren contra SQLite en memoria (no requieren Postgres). Los de `auth` tampoco tocan la base.
+Los tests de `cuentas`, `servicios`, `arqueo`, `conteo-monedas`, `ventas`, `comisiones`, `directorio`, `inventario`, `dashboard` y `seed` corren contra SQLite en memoria (no requieren Postgres). Los de `auth` tampoco tocan la base.
 
 ## Estado
 
@@ -123,3 +130,4 @@ Los tests de `cuentas`, `servicios`, `arqueo`, `conteo-monedas`, `ventas`, `comi
 - **Fase 5** — completa y migrada: `ProveedorComision`/`TransaccionComision`, calculadora de comisiones, Payphone/Deuna sembrados con 0% (configurar los % reales vía PATCH).
 - **Fase 6** — completa y migrada: `Directorio` de códigos/notas con búsqueda.
 - **Fase 7** — completa y migrada: `Accesorio`/`MovimientoInventario`, stock protegido contra salidas mayores al disponible.
+- **Fase 8** — completa (sin migración, no crea tablas): dashboard con resumen diario y por rango.

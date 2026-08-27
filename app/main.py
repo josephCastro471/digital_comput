@@ -6,6 +6,7 @@ from app.routers import (
     comisiones,
     conteo_monedas,
     cuentas,
+    dashboard,
     directorio,
     inventario,
     servicios,
@@ -23,6 +24,7 @@ app.include_router(ventas.router)
 app.include_router(comisiones.router)
 app.include_router(directorio.router)
 app.include_router(inventario.router)
+app.include_router(dashboard.router)
 
 
 @app.get("/health")
