@@ -99,13 +99,19 @@ CRUD simple (`Directorio`), tipo `empresa` o `cliente`, con campos opcionales `c
 - `GET /api/directorio?buscar=` — busca (case-insensitive) en `nombre`, `codigo`, `red`, `cedula_cuenta` y `nota`.
 - `POST /api/directorio`, `PATCH /api/directorio/{id}` (el PATCH permite limpiar un campo enviándolo como `null`), `DELETE /api/directorio/{id}`.
 
+## Inventario de accesorios (Fase 7)
+
+- `GET /api/inventario`, `POST /api/inventario` (acepta `stock_actual` inicial, default 0).
+- `PATCH /api/inventario/{id}` — solo `nombre`/`costo`/`precio_venta`. El stock **no** se edita por PATCH, solo vía movimientos (mismo principio que `saldo_actual` en cuentas).
+- `POST /api/inventario/{id}/movimiento` — `tipo` es `"entrada"` o `"salida"` (a diferencia de los demás módulos, el modelo lo define como `str` libre, no un enum — ver `computdigital-reglas.md`); `salida` rechaza con 400 si `cantidad` supera el `stock_actual`. Devuelve el movimiento creado (no el accesorio).
+
 ## Tests
 
 ```bash
 pytest
 ```
 
-Los tests de `cuentas`, `servicios`, `arqueo`, `conteo-monedas`, `ventas`, `comisiones`, `directorio` y `seed` corren contra SQLite en memoria (no requieren Postgres). Los de `auth` tampoco tocan la base.
+Los tests de `cuentas`, `servicios`, `arqueo`, `conteo-monedas`, `ventas`, `comisiones`, `directorio`, `inventario` y `seed` corren contra SQLite en memoria (no requieren Postgres). Los de `auth` tampoco tocan la base.
 
 ## Estado
 
@@ -116,3 +122,4 @@ Los tests de `cuentas`, `servicios`, `arqueo`, `conteo-monedas`, `ventas`, `comi
 - **Fase 4** — completa y migrada: `Venta`/`VentaItem`, precio automático según `tipo_precio`, depósito automático en cuenta cuando se especifica `cuenta_id`.
 - **Fase 5** — completa y migrada: `ProveedorComision`/`TransaccionComision`, calculadora de comisiones, Payphone/Deuna sembrados con 0% (configurar los % reales vía PATCH).
 - **Fase 6** — completa y migrada: `Directorio` de códigos/notas con búsqueda.
+- **Fase 7** — completa y migrada: `Accesorio`/`MovimientoInventario`, stock protegido contra salidas mayores al disponible.
