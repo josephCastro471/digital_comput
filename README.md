@@ -67,16 +67,25 @@ Es idempotente — si ya existen no duplica. Crea: Caja (efectivo), Pichincha (c
 
 No hay seed de servicios — regla dura: el catálogo lo carga Joseph directo en el sistema.
 
+## Arqueo de caja y conteo de monedas (Fase 3)
+
+- `POST /api/arqueo/abrir` — abre un turno (`saldo_apertura` opcional, default 40.00). Falla con 409 si ya hay un turno `abierto` (regla dura: solo uno a la vez).
+- `POST /api/arqueo/{id}/cerrar` — recibe `detalles: [{denominacion, cantidad}]` (conteo físico del efectivo), calcula `saldo_cierre` y `ganancia_neta = saldo_cierre - saldo_apertura`.
+- `GET /api/arqueo?estado=&fecha=` y `GET /api/arqueo/{id}`.
+- `POST /api/conteo-monedas` — calculadora de apoyo para conteo de monedas de terceros (`denominaciones: {"0.05": 50, ...}`, calcula `total`). **Nunca** crea `movimiento_cuenta` — no afecta saldos.
+- `GET /api/conteo-monedas?fecha=`.
+
 ## Tests
 
 ```bash
 pytest
 ```
 
-Los tests de `cuentas`, `servicios` y `seed` corren contra SQLite en memoria (no requieren Postgres). Los de `auth` tampoco tocan la base.
+Los tests de `cuentas`, `servicios`, `arqueo`, `conteo-monedas` y `seed` corren contra SQLite en memoria (no requieren Postgres). Los de `auth` tampoco tocan la base.
 
 ## Estado
 
 - **Fase 0** — completa: estructura de carpetas, FastAPI + SQLAlchemy 2.0 + Alembic apuntando a Postgres, auth JWT con un solo admin (sin tabla de usuarios; credenciales vía `.env`).
 - **Fase 1** — completa y migrada: modelos `Cuenta`/`MovimientoCuenta`, endpoints, seed de las 6 cuentas reales.
 - **Fase 2** — completa y migrada: catálogo de servicios (`Servicio`/`EscalonPrecio`), endpoints. La UI de alta rápida queda pendiente para cuando arranque `computdigital-frontend/`.
+- **Fase 3** — completa y migrada: `ArqueoCaja`/`ArqueoDetalle` (por turno, un abierto a la vez) y `ConteoMonedas` (independiente, no toca cuentas).
