@@ -57,7 +57,7 @@ python -m app.seed
 
 Es idempotente — si ya existen no duplica. Crea:
 - Las 6 cuentas reales: Caja (efectivo), Pichincha (cupo_revolvente), Guayaquil/Bolivariano/Pacífico/Fullcarga (fondo_fijo), todas con saldo en 0.00 — los saldos reales se cargan después vía `POST /api/cuentas/{id}/movimientos` o `PATCH /api/cuentas/{id}/cupo`.
-- Los 2 proveedores de comisión (Payphone, Deuna) con `comision_pct`/`iva_pct` en 0 — no hay endpoint `POST` para proveedores (regla dura: la config va en tabla, no en código), así que se siembran acá y se configuran los % reales después vía `PATCH /api/comisiones/proveedores/{id}`.
+- Los 2 proveedores de comisión con sus % reales: Payphone (`comision_pct=5`, `iva_pct=15`) y Deuna (`comision_pct=4`, `iva_pct=15`), ambos con `aplica_iva=true`. No hay endpoint `POST` para proveedores (regla dura: la config va en tabla, no en código) — si la tarifa cambia, se ajusta vía `PATCH /api/comisiones/proveedores/{id}`.
 
 ## Catálogo de servicios (Fase 2)
 
@@ -127,7 +127,24 @@ Los tests de `cuentas`, `servicios`, `arqueo`, `conteo-monedas`, `ventas`, `comi
 - **Fase 2** — completa y migrada: catálogo de servicios (`Servicio`/`EscalonPrecio`), endpoints. La UI de alta rápida queda pendiente para cuando arranque `computdigital-frontend/`.
 - **Fase 3** — completa y migrada: `ArqueoCaja`/`ArqueoDetalle` (por turno, un abierto a la vez) y `ConteoMonedas` (independiente, no toca cuentas).
 - **Fase 4** — completa y migrada: `Venta`/`VentaItem`, precio automático según `tipo_precio`, depósito automático en cuenta cuando se especifica `cuenta_id`.
-- **Fase 5** — completa y migrada: `ProveedorComision`/`TransaccionComision`, calculadora de comisiones, Payphone/Deuna sembrados con 0% (configurar los % reales vía PATCH).
+- **Fase 5** — completa y migrada: `ProveedorComision`/`TransaccionComision`, calculadora de comisiones. La fórmula es de "gross-up": `valor_recibir` es el neto que el negocio se debe quedar, `valor_cobrado` se calcula para que, tras descontar comisión + IVA sobre la comisión, quede exacto ese neto. Payphone (5% + IVA 15%) y Deuna (4% + IVA 15%) sembrados con sus % reales.
 - **Fase 6** — completa y migrada: `Directorio` de códigos/notas con búsqueda.
 - **Fase 7** — completa y migrada: `Accesorio`/`MovimientoInventario`, stock protegido contra salidas mayores al disponible.
 - **Fase 8** — completa (sin migración, no crea tablas): dashboard con resumen diario y por rango.
+- **Fase 9** — CI con GitHub Actions (corre los tests en cada push/PR a `main`) y `render.yaml` para desplegar en Render. Deploy pendiente de que Joseph conecte el repo en Render.
+
+## CI
+
+`.github/workflows/tests.yml` corre `pytest` en cada push/PR a `main` (Python 3.12, con variables de entorno dummy solo para que `Settings()` pueda instanciarse — los tests usan SQLite en memoria, nunca tocan una base real).
+
+## Deploy a producción (Render + Neon)
+
+1. En Neon, crear (o usar) la base de datos y copiar la connection string. Armar el `DATABASE_URL` con el prefijo de SQLAlchemy: `postgresql+psycopg://usuario:password@ep-xxx.neon.tech/nombre_db?sslmode=require`.
+2. En Render: **New > Blueprint**, conectar este repo — Render lee `render.yaml` y crea el servicio automáticamente.
+3. Completar las variables de entorno marcadas `sync: false` en el dashboard de Render (no van en `render.yaml` por ser secretas):
+   - `DATABASE_URL` — la de Neon del paso 1.
+   - `SECRET_KEY` — una cadena aleatoria (no reutilizar la de desarrollo local).
+   - `ADMIN_USERNAME` / `ADMIN_PASSWORD_HASH` — ver "Generar el hash de la contraseña de admin" arriba.
+   - `CORS_ORIGINS` — la URL del frontend en Vercel una vez desplegado (ej: `https://digital-comput-front.vercel.app`). Sin esto, el navegador bloquea las llamadas del frontend por CORS.
+4. El build de Render corre `pip install -r requirements.txt && alembic upgrade head && python -m app.seed` — migra el schema y siembra las 6 cuentas reales + Payphone/Deuna automáticamente en cada deploy (idempotente, no duplica).
+5. `healthCheckPath: /health` — Render lo usa para saber si el servicio arrancó bien.

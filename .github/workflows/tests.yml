@@ -1,0 +1,29 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: "postgresql+psycopg://user:pass@localhost/dummy"
+      SECRET_KEY: "ci-only-secret-key-not-used-in-production-32b"
+      ADMIN_USERNAME: "admin"
+      ADMIN_PASSWORD_HASH: "$2b$12$CI0000000000000000000uCIhashplaceholder0000000000000"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Correr tests
+        run: pytest -q
