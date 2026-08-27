@@ -13,7 +13,13 @@ class Settings(BaseSettings):
     admin_username: str
     admin_password_hash: str
 
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [origen.strip() for origen in self.cors_origins.split(",") if origen.strip()]
 
 
 @lru_cache
