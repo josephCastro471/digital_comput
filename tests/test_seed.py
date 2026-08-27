@@ -1,6 +1,12 @@
 import app.seed as seed_module
+from app.models.comision import ProveedorComision
 from app.models.cuenta import Cuenta, TipoCuenta
-from app.seed import CUENTAS_INICIALES, seed_cuentas
+from app.seed import (
+    CUENTAS_INICIALES,
+    PROVEEDORES_COMISION_INICIALES,
+    seed_cuentas,
+    seed_proveedores_comision,
+)
 
 
 def test_seed_crea_las_6_cuentas(db_session, monkeypatch):
@@ -30,3 +36,29 @@ def test_seed_es_idempotente(db_session, monkeypatch):
     session.close()
 
     assert len(cuentas) == 6
+
+
+def test_seed_crea_los_proveedores_de_comision(db_session, monkeypatch):
+    monkeypatch.setattr(seed_module, "SessionLocal", db_session)
+
+    seed_proveedores_comision()
+
+    session = db_session()
+    proveedores = session.query(ProveedorComision).all()
+    session.close()
+
+    assert {p.nombre for p in proveedores} == set(PROVEEDORES_COMISION_INICIALES)
+    assert all(p.comision_pct == 0 for p in proveedores)
+
+
+def test_seed_proveedores_es_idempotente(db_session, monkeypatch):
+    monkeypatch.setattr(seed_module, "SessionLocal", db_session)
+
+    seed_proveedores_comision()
+    seed_proveedores_comision()
+
+    session = db_session()
+    proveedores = session.query(ProveedorComision).all()
+    session.close()
+
+    assert len(proveedores) == 2
