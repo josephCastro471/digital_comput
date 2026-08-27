@@ -6,8 +6,10 @@ from app.core.deps import get_current_admin
 from app.database import get_db
 from app.models.cuenta import Cuenta, MovimientoCuenta, TipoCuenta, TipoMovimiento
 from app.schemas.cuenta import (
+    CuentaCierreDiaOut,
     CuentaCupoUpdate,
     CuentaOut,
+    CuentaSaldoDiaIn,
     MovimientoCuentaCreate,
     MovimientoCuentaOut,
 )
@@ -86,6 +88,70 @@ def crear_movimiento(cuenta_id: int, payload: MovimientoCuentaCreate, db: Sessio
     db.commit()
     db.refresh(movimiento)
     return movimiento
+
+
+def _sincronizar_saldo(cuenta: Cuenta, db: Session, saldo_real, nota: str, referencia_tipo: str) -> None:
+    """Crea un movimiento de ajuste que corrige saldo_actual para que coincida
+    con el valor real ingresado (ej. el saldo bancario verificado a mano). No
+    crea nada si ya coinciden, para no ensuciar el historial con ajustes de 0."""
+    delta = saldo_real - cuenta.saldo_actual
+    if delta == 0:
+        return
+    aplicar_movimiento(cuenta, TipoMovimiento.AJUSTE, delta)
+    db.add(
+        MovimientoCuenta(
+            cuenta_id=cuenta.id,
+            tipo=TipoMovimiento.AJUSTE,
+            monto=delta,
+            referencia_tipo=referencia_tipo,
+            nota=nota,
+        )
+    )
+
+
+@router.post("/{cuenta_id}/iniciar-dia", response_model=CuentaOut)
+def iniciar_dia(cuenta_id: int, payload: CuentaSaldoDiaIn, db: Session = Depends(get_db)):
+    cuenta = _get_cuenta_or_404(db, cuenta_id)
+    if cuenta.tipo != TipoCuenta.FONDO_FIJO:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Iniciar/cerrar dia solo aplica a cuentas de tipo fondo_fijo",
+        )
+
+    _sincronizar_saldo(
+        cuenta, db, payload.saldo, "Saldo verificado al iniciar el dia", "inicio_dia"
+    )
+    cuenta.saldo_inicial_dia = payload.saldo
+    db.commit()
+    db.refresh(cuenta)
+    return cuenta
+
+
+@router.post("/{cuenta_id}/cerrar-dia", response_model=CuentaCierreDiaOut)
+def cerrar_dia(cuenta_id: int, payload: CuentaSaldoDiaIn, db: Session = Depends(get_db)):
+    cuenta = _get_cuenta_or_404(db, cuenta_id)
+    if cuenta.tipo != TipoCuenta.FONDO_FIJO:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Iniciar/cerrar dia solo aplica a cuentas de tipo fondo_fijo",
+        )
+
+    recaudado = cuenta.saldo_inicial_dia - payload.saldo
+    _sincronizar_saldo(
+        cuenta,
+        db,
+        payload.saldo,
+        f"Cuadre de fondo: recaudado {recaudado}",
+        "cuadre_fondo",
+    )
+    db.commit()
+    db.refresh(cuenta)
+    return CuentaCierreDiaOut(
+        recaudado=recaudado,
+        saldo_inicial_dia=cuenta.saldo_inicial_dia,
+        saldo_final=payload.saldo,
+        cuenta=cuenta,
+    )
 
 
 @router.patch("/{cuenta_id}/cupo", response_model=CuentaOut)

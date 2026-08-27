@@ -131,7 +131,16 @@ Los tests de `cuentas`, `servicios`, `arqueo`, `conteo-monedas`, `ventas`, `comi
 - **Fase 6** — completa y migrada: `Directorio` de códigos/notas con búsqueda.
 - **Fase 7** — completa y migrada: `Accesorio`/`MovimientoInventario`, stock protegido contra salidas mayores al disponible.
 - **Fase 8** — completa (sin migración, no crea tablas): dashboard con resumen diario y por rango.
-- **Fase 9** — CI con GitHub Actions (corre los tests en cada push/PR a `main`) y `render.yaml` para desplegar en Render. Deploy pendiente de que Joseph conecte el repo en Render.
+- **Fase 9** — CI con GitHub Actions, `render.yaml`, y ya desplegado en producción: backend en Render, frontend en Vercel, base en Neon.
+
+## Cuadre de fondos fijos (post-deploy)
+
+Los 4 fondos fijos (Guayaquil, Bolivariano, Pacífico, Fullcarga) representan efectivo entregado a clientes por retiros vía el banco correspondiente — Joseph verifica el saldo real de la cuenta bancaria a mano, no registra un movimiento por cada retiro. Dos endpoints nuevos, restringidos a `tipo=fondo_fijo`:
+
+- `POST /api/cuentas/{id}/iniciar-dia` — `{saldo}`: guarda ese valor en `saldo_inicial_dia` y, si difiere del `saldo_actual` del sistema, crea un movimiento de `ajuste` para sincronizarlo (sin ajuste si ya coinciden).
+- `POST /api/cuentas/{id}/cerrar-dia` — `{saldo}`: calcula `recaudado = saldo_inicial_dia - saldo`, corrige `saldo_actual` al valor real con otro `ajuste` (nota incluye el recaudado calculado), y devuelve `{recaudado, saldo_inicial_dia, saldo_final, cuenta}`.
+
+Ambos reutilizan `MovimientoCuenta` para el historial — no se agregó ninguna tabla ni columna nueva.
 
 ## CI
 

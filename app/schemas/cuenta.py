@@ -52,3 +52,14 @@ class MovimientoCuentaCreate(BaseModel):
 
 class CuentaCupoUpdate(BaseModel):
     cupo_transaccional: Decimal = Field(ge=0)
+
+
+class CuentaSaldoDiaIn(BaseModel):
+    saldo: Decimal = Field(ge=0)
+
+
+class CuentaCierreDiaOut(BaseModel):
+    recaudado: Decimal
+    saldo_inicial_dia: Decimal
+    saldo_final: Decimal
+    cuenta: CuentaOut
