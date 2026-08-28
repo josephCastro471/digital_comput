@@ -162,30 +162,81 @@ def test_iniciar_dia_sincroniza_saldo_y_guarda_inicial(client, db_session, auth_
     assert movimientos[0]["monto"] == "323.88"
 
 
-def test_cerrar_dia_caso_real_bolivariano(client, db_session, auth_headers):
+def test_cerrar_dia_retirando_todo_caso_real_bolivariano(client, db_session, auth_headers):
     cuenta_id = _crear_cuenta(
         db_session,
         nombre="Bolivariano",
         tipo=TipoCuenta.FONDO_FIJO,
-        saldo_actual=Decimal("323.88"),
+        saldo_actual=Decimal("323.54"),
     )
     session = db_session()
     cuenta = session.get(Cuenta, cuenta_id)
-    cuenta.saldo_inicial_dia = Decimal("323.88")
+    cuenta.saldo_inicial_dia = Decimal("323.54")
     session.commit()
     session.close()
 
     response = client.post(
         f"/api/cuentas/{cuenta_id}/cerrar-dia",
-        json={"saldo": "92.34"},
+        json={"saldo_banco": "92.34", "monto_retirado": "231.20"},
         headers=auth_headers,
     )
     assert response.status_code == 200
     body = response.json()
-    assert body["recaudado"] == "231.54"
-    assert body["saldo_inicial_dia"] == "323.88"
-    assert body["saldo_final"] == "92.34"
+    assert body["recaudado"] == "231.20"
+    assert body["monto_retirado"] == "231.20"
+    assert body["saldo_inicial_dia"] == "323.54"
+    assert body["saldo_banco"] == "92.34"
+    assert body["nueva_base"] == "92.34"
     assert body["cuenta"]["saldo_actual"] == "92.34"
+    assert body["cuenta"]["saldo_inicial_dia"] == "92.34"
+
+
+def test_cerrar_dia_retiro_parcial_caso_real_fullcarga(client, db_session, auth_headers):
+    cuenta_id = _crear_cuenta(
+        db_session,
+        nombre="Fullcarga",
+        tipo=TipoCuenta.FONDO_FIJO,
+        saldo_actual=Decimal("290.00"),
+    )
+    session = db_session()
+    cuenta = session.get(Cuenta, cuenta_id)
+    cuenta.saldo_inicial_dia = Decimal("290.00")
+    session.commit()
+    session.close()
+
+    response = client.post(
+        f"/api/cuentas/{cuenta_id}/cerrar-dia",
+        json={"saldo_banco": "275.35", "monto_retirado": "10.00"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["recaudado"] == "14.65"
+    assert body["monto_retirado"] == "10.00"
+    assert body["nueva_base"] == "280.00"
+    assert body["cuenta"]["saldo_actual"] == "280.00"
+    assert body["cuenta"]["saldo_inicial_dia"] == "280.00"
+
+
+def test_cerrar_dia_rechaza_retiro_mayor_a_lo_recaudado(client, db_session, auth_headers):
+    cuenta_id = _crear_cuenta(
+        db_session,
+        nombre="Fullcarga",
+        tipo=TipoCuenta.FONDO_FIJO,
+        saldo_actual=Decimal("290.00"),
+    )
+    session = db_session()
+    cuenta = session.get(Cuenta, cuenta_id)
+    cuenta.saldo_inicial_dia = Decimal("290.00")
+    session.commit()
+    session.close()
+
+    response = client.post(
+        f"/api/cuentas/{cuenta_id}/cerrar-dia",
+        json={"saldo_banco": "275.35", "monto_retirado": "50.00"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 400
 
 
 def test_cerrar_dia_sin_drift_no_crea_movimiento(client, db_session, auth_headers):
@@ -199,11 +250,12 @@ def test_cerrar_dia_sin_drift_no_crea_movimiento(client, db_session, auth_header
 
     response = client.post(
         f"/api/cuentas/{cuenta_id}/cerrar-dia",
-        json={"saldo": "50.00"},
+        json={"saldo_banco": "50.00", "monto_retirado": "0"},
         headers=auth_headers,
     )
     assert response.status_code == 200
     assert response.json()["recaudado"] == "0.00"
+    assert response.json()["nueva_base"] == "50.00"
 
     movimientos = client.get(f"/api/cuentas/{cuenta_id}/movimientos", headers=auth_headers).json()
     assert movimientos == []

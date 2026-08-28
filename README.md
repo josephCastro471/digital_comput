@@ -135,10 +135,12 @@ Los tests de `cuentas`, `servicios`, `arqueo`, `conteo-monedas`, `ventas`, `comi
 
 ## Cuadre de fondos fijos (post-deploy)
 
-Los 4 fondos fijos (Guayaquil, Bolivariano, Pacífico, Fullcarga) representan efectivo entregado a clientes por retiros vía el banco correspondiente — Joseph verifica el saldo real de la cuenta bancaria a mano, no registra un movimiento por cada retiro. Dos endpoints nuevos, restringidos a `tipo=fondo_fijo`:
+Los 4 fondos fijos (Guayaquil, Bolivariano, Pacífico, Fullcarga) representan efectivo entregado a clientes por retiros vía el banco correspondiente — Joseph verifica el saldo real de la cuenta bancaria a mano, no registra un movimiento por cada retiro. Dos endpoints, restringidos a `tipo=fondo_fijo`:
 
 - `POST /api/cuentas/{id}/iniciar-dia` — `{saldo}`: guarda ese valor en `saldo_inicial_dia` y, si difiere del `saldo_actual` del sistema, crea un movimiento de `ajuste` para sincronizarlo (sin ajuste si ya coinciden).
-- `POST /api/cuentas/{id}/cerrar-dia` — `{saldo}`: calcula `recaudado = saldo_inicial_dia - saldo`, corrige `saldo_actual` al valor real con otro `ajuste` (nota incluye el recaudado calculado), y devuelve `{recaudado, saldo_inicial_dia, saldo_final, cuenta}`.
+- `POST /api/cuentas/{id}/cerrar-dia` — `{saldo_banco, monto_retirado}`: calcula `recaudado = saldo_inicial_dia - saldo_banco` (dinero que salió del fondo hoy). De ese recaudado, Joseph solo retira físicamente `monto_retirado` (puede ser parcial); el resto queda dentro del fondo. La nueva base para el próximo ciclo es `saldo_inicial_dia - monto_retirado` (no el saldo bancario crudo) — se guarda tanto en `saldo_actual` como en `saldo_inicial_dia`, así que no hace falta llamar `iniciar-dia` al otro día salvo que quiera re-verificar contra el banco. Rechaza con 400 si `monto_retirado` supera lo recaudado. Devuelve `{recaudado, monto_retirado, saldo_inicial_dia, saldo_banco, nueva_base, cuenta}`.
+
+  Ejemplo real: Fullcarga abre con 290, banco marca 275.35 (recaudado 14.65), Joseph retira solo 10 → nueva base 280. Bolivariano abre con 323.54, banco marca 92.34, retira todo (231.20) → nueva base 92.34 (coincide con el saldo bancario porque no quedó nada sin retirar).
 
 Ambos reutilizan `MovimientoCuenta` para el historial — no se agregó ninguna tabla ni columna nueva.
 

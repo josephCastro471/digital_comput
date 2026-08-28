@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -6,6 +8,7 @@ from app.core.deps import get_current_admin
 from app.database import get_db
 from app.models.cuenta import Cuenta, MovimientoCuenta, TipoCuenta, TipoMovimiento
 from app.schemas.cuenta import (
+    CuentaCierreDiaIn,
     CuentaCierreDiaOut,
     CuentaCupoUpdate,
     CuentaOut,
@@ -128,7 +131,14 @@ def iniciar_dia(cuenta_id: int, payload: CuentaSaldoDiaIn, db: Session = Depends
 
 
 @router.post("/{cuenta_id}/cerrar-dia", response_model=CuentaCierreDiaOut)
-def cerrar_dia(cuenta_id: int, payload: CuentaSaldoDiaIn, db: Session = Depends(get_db)):
+def cerrar_dia(cuenta_id: int, payload: CuentaCierreDiaIn, db: Session = Depends(get_db)):
+    """Cuadre de un fondo fijo: se compara el saldo bancario verificado contra
+    saldo_inicial_dia para saber cuanto se recaudo (dinero que salio del fondo
+    hoy). De eso, solo una parte puede retirarse fisicamente (monto_retirado);
+    el resto queda "guardado" dentro del fondo. La nueva base para el proximo
+    ciclo es saldo_inicial_dia - monto_retirado (no el saldo bancario crudo),
+    porque lo no retirado sigue siendo parte del fondo aunque fisicamente este
+    mezclado con el saldo bancario verificado."""
     cuenta = _get_cuenta_or_404(db, cuenta_id)
     if cuenta.tipo != TipoCuenta.FONDO_FIJO:
         raise HTTPException(
@@ -136,20 +146,34 @@ def cerrar_dia(cuenta_id: int, payload: CuentaSaldoDiaIn, db: Session = Depends(
             detail="Iniciar/cerrar dia solo aplica a cuentas de tipo fondo_fijo",
         )
 
-    recaudado = cuenta.saldo_inicial_dia - payload.saldo
+    saldo_inicial_previo = cuenta.saldo_inicial_dia
+    recaudado = saldo_inicial_previo - payload.saldo_banco
+    max_retirable = recaudado if recaudado > 0 else Decimal("0")
+    if payload.monto_retirado > max_retirable:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No se puede retirar mas de lo recaudado ({max_retirable})",
+        )
+
+    nueva_base = saldo_inicial_previo - payload.monto_retirado
+
     _sincronizar_saldo(
         cuenta,
         db,
-        payload.saldo,
-        f"Cuadre de fondo: recaudado {recaudado}",
+        nueva_base,
+        f"Cuadre de fondo: recaudado {recaudado}, retirado {payload.monto_retirado}, "
+        f"nueva base {nueva_base}",
         "cuadre_fondo",
     )
+    cuenta.saldo_inicial_dia = nueva_base
     db.commit()
     db.refresh(cuenta)
     return CuentaCierreDiaOut(
         recaudado=recaudado,
-        saldo_inicial_dia=cuenta.saldo_inicial_dia,
-        saldo_final=payload.saldo,
+        monto_retirado=payload.monto_retirado,
+        saldo_inicial_dia=saldo_inicial_previo,
+        saldo_banco=payload.saldo_banco,
+        nueva_base=nueva_base,
         cuenta=cuenta,
     )
 
