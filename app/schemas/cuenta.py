@@ -54,19 +54,12 @@ class CuentaCupoUpdate(BaseModel):
     cupo_transaccional: Decimal = Field(ge=0)
 
 
-class CuentaSaldoDiaIn(BaseModel):
-    saldo: Decimal = Field(ge=0)
+class CuentaCuadreIn(BaseModel):
+    valor_actual: Decimal = Field(ge=0)
 
 
-class CuentaCierreDiaIn(BaseModel):
-    saldo_banco: Decimal = Field(ge=0)
-    monto_retirado: Decimal = Field(ge=0, default=Decimal("0"))
-
-
-class CuentaCierreDiaOut(BaseModel):
+class CuentaCuadreOut(BaseModel):
     recaudado: Decimal
-    monto_retirado: Decimal
-    saldo_inicial_dia: Decimal
-    saldo_banco: Decimal
-    nueva_base: Decimal
+    valor_inicial: Decimal
+    valor_actual: Decimal
     cuenta: CuentaOut

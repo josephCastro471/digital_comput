@@ -135,14 +135,13 @@ Los tests de `cuentas`, `servicios`, `arqueo`, `conteo-monedas`, `ventas`, `comi
 
 ## Cuadre de fondos fijos (post-deploy)
 
-Los 4 fondos fijos (Guayaquil, Bolivariano, Pacífico, Fullcarga) representan efectivo entregado a clientes por retiros vía el banco correspondiente — Joseph verifica el saldo real de la cuenta bancaria a mano, no registra un movimiento por cada retiro. Dos endpoints, restringidos a `tipo=fondo_fijo`:
+Los 4 fondos fijos (Guayaquil, Bolivariano, Pacífico, Fullcarga) representan efectivo entregado a clientes por retiros vía el banco correspondiente — Joseph verifica el saldo real de la cuenta bancaria a mano, no registra un movimiento por cada retiro. Un solo endpoint, restringido a `tipo=fondo_fijo`:
 
-- `POST /api/cuentas/{id}/iniciar-dia` — `{saldo}`: guarda ese valor en `saldo_inicial_dia` y, si difiere del `saldo_actual` del sistema, crea un movimiento de `ajuste` para sincronizarlo (sin ajuste si ya coinciden).
-- `POST /api/cuentas/{id}/cerrar-dia` — `{saldo_banco, monto_retirado}`: calcula `recaudado = saldo_inicial_dia - saldo_banco` (dinero que salió del fondo hoy). De ese recaudado, Joseph solo retira físicamente `monto_retirado` (puede ser parcial); el resto queda dentro del fondo. La nueva base para el próximo ciclo es `saldo_inicial_dia - monto_retirado` (no el saldo bancario crudo) — se guarda tanto en `saldo_actual` como en `saldo_inicial_dia`, así que no hace falta llamar `iniciar-dia` al otro día salvo que quiera re-verificar contra el banco. Rechaza con 400 si `monto_retirado` supera lo recaudado. Devuelve `{recaudado, monto_retirado, saldo_inicial_dia, saldo_banco, nueva_base, cuenta}`.
+- `POST /api/cuentas/{id}/cuadre` — `{valor_actual}`: calcula `recaudado = valor_inicial (lo guardado desde el último cuadre) - valor_actual`. `valor_actual` es lo que Joseph decide que queda en la cuenta ahora mismo (haya retirado todo, una parte, o nada — no es necesariamente el saldo bancario literal si retiró solo una parte). Ese valor se guarda tanto en `saldo_actual` como en `saldo_inicial_dia`, así que pasa a ser el `valor_inicial` del próximo cuadre automáticamente — no hay pasos separados de abrir/cerrar día. Devuelve `{recaudado, valor_inicial, valor_actual, cuenta}`.
 
-  Ejemplo real: Fullcarga abre con 290, banco marca 275.35 (recaudado 14.65), Joseph retira solo 10 → nueva base 280. Bolivariano abre con 323.54, banco marca 92.34, retira todo (231.20) → nueva base 92.34 (coincide con el saldo bancario porque no quedó nada sin retirar).
+  Ejemplo real: Fullcarga arranca con 290 de valor inicial; el banco marca 275.35 pero Joseph solo retira 10, así que escribe `valor_actual=280` → recaudado 10, y 280 queda como el valor inicial del próximo cuadre. Bolivariano arranca con 323.54, retira todo y escribe `valor_actual=92.34` → recaudado 231.20.
 
-Ambos reutilizan `MovimientoCuenta` para el historial — no se agregó ninguna tabla ni columna nueva.
+Reutiliza `MovimientoCuenta` para el historial — no se agregó ninguna tabla ni columna nueva.
 
 ## CI
 
